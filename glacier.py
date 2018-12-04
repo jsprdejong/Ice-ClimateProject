@@ -11,8 +11,8 @@ E0=2900 # m height equilibrium line t=0
 dt=1 #yr
 
 #set bottom slope glacier
-x=np.zeros(b0/s)
-b=np.zeros(x)
+x=np.zeros(len(b0/s))
+b=np.zeros(len(x))
 
 #bottom bed slope
 for i in range(len(x)):
