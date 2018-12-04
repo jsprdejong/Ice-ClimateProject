@@ -23,6 +23,7 @@ W=1. #m glacier width
 d = 0# water depth
 kappa = 1. # fraction of mean ice thickness 
 
+
 #settings
 dx = 100 #m
 dt=1 #yr
@@ -83,6 +84,7 @@ def dL_dt(L,Bs,F):
 # =============================================================================
 # Main programm
 # =============================================================================
+
 Bs_arr = np.zeros(tmax)
 Hm_arr = np.zeros(tmax)
 F_arr = np.zeros(tmax)
@@ -94,3 +96,4 @@ for i in range(tmax-1):
     Hm_arr[i+1] = Hm(L_arr[i+1])
     Bs_arr[i+1] = Bs(Hm_arr[i+1],E,L_arr[i+1])
     F_arr[i+1] =  F(Hm_arr[i+1])    
+
