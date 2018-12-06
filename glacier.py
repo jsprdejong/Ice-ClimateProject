@@ -2,7 +2,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-
 import numpy as np #This file is a preliminary version of the ice sheet model
 import matplotlib.pyplot as plt
 from types import NoneType
@@ -43,28 +42,32 @@ def Hm(L):
 def b(x):
     """bed elevation"""
     if bed_profile == 'linear':
-    	return b0 - s * x
+        return b0 - s * x
     elif bed_profile == 'concave':
-      	return ba + b0 * np.exp(-x/x_l)
-  	elif bed_profile =='Aletschglacier':
-      	if x<=8033:
-        	bed= b0_A-s_A1*x
+        return ba + b0 * np.exp(-x/x_l)
+    elif bed_profile =='Aletschglacier':
+        if x<=8033.:
+            bed = b0-s_A1*x
+        else:
+            bed = b0-s_A2*x
+        return bed
   
 def mean_b(L):
     if bed_profile == 'linear':
         return b0 - s*L/2.
     elif bed_profile == 'concave':
         return ba + x_l*b0/L*(1-np.exp(-L/x_l))
-    elif bed_profile == 'Aletschglacier'
+    elif bed_profile == 'Aletschglacier':
+      	return b0-s_A1*8033./2.-s_A2*(L-8033.)/2.
     	
-      
-    
 def mean_s(L):
     """mean bed slope"""
     if bed_profile == 'linear':
         return s 
     if bed_profile == 'concave':
-            return b0*(1-np.exp(-L/x_l))/L
+        return b0*(1-np.exp(-L/x_l))/L
+    if bed_profile == 'Aletschglacier':
+      	return (8033.*s_A1+(L-8033.)*s_A2)/L
 
 def dmean_s_dL(L,x):
     """change of the mean bed slope with respect to glacier length"""
@@ -93,7 +96,7 @@ def dL_dt(L,Bs,F):
 # =============================================================================
 # Glacier Tools
 # =============================================================================
-def integrate(L_prev,Hm_prev,Bs_prev,F_prev,E=E0):
+def integrate(L_prev,Hm_prev,Bs_prev,F_prev,E):
     """Integrate one timestep"""
     L_new = L_prev + dL_dt(L_prev,Bs_prev,F_prev)*dt
     Hm_new = Hm(L_new)
@@ -101,13 +104,19 @@ def integrate(L_prev,Hm_prev,Bs_prev,F_prev,E=E0):
     F_new = F(Hm_new)    
     return L_new, Hm_new, Bs_new, F_new
   
-def steady_state(E=E0,L_0=0.001,min_dL_dt=0.1):
-    """Returns year when steady-state is reached."""
+def steady_state(E, L_0=0.001, min_dL_dt=0.1):
+    """Returns year when steady-state is reached.
+    
+    :param E:          equilibrium line height
+    :param L_0:        initial glacier length (default=0.001)
+    :param min_dL_dt:  goal in difference in glacier length to 
+                       achieve equilibrium
+    """
     Bs_0 = 0
     Hm_0 = 0
     F_0= 0
     i = 0
-    L_new, Hm_new, Bs_new, F_new = integrate(L_0,Hm_0,Bs_0,F_0)
+    L_new, Hm_new, Bs_new, F_new = integrate(L_0,Hm_0,Bs_0,F_0,E)
     while dL_dt(L_new,Bs_new,F_new) > min_dL_dt or i<10:
         L_prev = L_new
         Hm_prev = Hm_new
@@ -118,7 +127,11 @@ def steady_state(E=E0,L_0=0.001,min_dL_dt=0.1):
     return i, L_new
   
 def efolding(E,L_0):
-    """Returns e-folding timescale."""
+    """Returns e-folding timescale.
+    
+    :param E: equilibrium line height
+    :param L_0: initial glacier length
+    """
     t_ss, L_ss = steady_state(E,L_0)
     L_efold = (1-1/np.exp(1))*(L_ss-L_0)+L_0
 
@@ -161,18 +174,18 @@ def find_current_ELA(L_today, dE = 50.):
         # newton method 
         correction =  L_diff1/deriv_L_diff
         E_current = E_current - correction
-   
+  	
     return E_current
   
-def project_ELA(year,dT_dt,current_ELA=None)
+def project_ELA(year,dT_dt,current_ELA=None):
     """Projecting the evolution of the ELA
     
     :param year: year 
     :param dT_dt: the change of temperature per year
     """   
-    if current_ELA == NoneType:
-        raise ValueError("The current ELA needs to be set orcomputed!")
-    return current_ELA + dE_dT *  dTdt * (year - base_year)
+    if type(current_ELA) == NoneType:
+        raise ValueError("The current ELA needs to be set or  computed!")
+    return current_ELA + dE_dT *  dT_dt * (year - base_year)
   
 def read_ELA():
     data = np.load("ELA.txt")
@@ -198,8 +211,10 @@ W = 1. # m glacier width
 
 # bed profile
 b0 = 3900. # upper bound bed elevation (m) for linear case, upper bound for concave case would be b0+ba
-ba = 0 # lower bound for concave bed profile
+ba = 0. # lower bound for concave bed profile
 s = 0.1 # Bed slope
+s_A1 = 0.1476401
+s_A2 = 0.0878518
 nu = 10.
 alpha = 3. #m^0.5
 beta = 0.007 #m ice/a/m
@@ -228,7 +243,7 @@ t_arr = np.arange(0,tmax,dt)
 # climate scenario
 # =================
 dT_dt = 0.01 # change of temparture per year K/a 
-dE_dT = 110  # change of the ELA per temperature change m/K
+dE_dT = 110.  # change of the ELA per temperature change m/K
 
 # =============================================================================
 # Main programm
@@ -242,10 +257,10 @@ L_arr = np.zeros(tmax)
 E = E0
 
 # initialize a first glacier
-L_arr[0] = L_2014
+L_arr[0] = 0.01 # L_2014
 
 for i in range(tmax-1):
     L_arr[i+1], Hm_arr[i+1], Bs_arr[i+1], F_arr[i+1] = \
-    integrate(L_arr[i],Hm_arr[i],Bs_arr[i],F_arr[i])  
+    integrate(L_arr[i],Hm_arr[i],Bs_arr[i],F_arr[i],E)  
 
 plot_results()
