@@ -45,11 +45,10 @@ def b(x):
         return b0 - s * x
     elif bed_profile == 'concave':
         return ba + b0 * np.exp(-x/x_l)
-    elif bed_profile =='Aletschglacier':
-        if x<=8033.:
-            bed = b0-s_A1*x
-        else:
-            bed = b0-s_A2*x
+    elif bed_profile == 'Aletschglacier':
+        bed = np.zeros(len(x))
+        bed[x < 8033] = b0 - s_A1 * x[x < 8033]
+        bed[x >= 8033] = b1 - s_A2 * (x[x >= 8033] - 8033)
         return bed
   
 def mean_b(L):
@@ -58,7 +57,10 @@ def mean_b(L):
     elif bed_profile == 'concave':
         return ba + x_l*b0/L*(1-np.exp(-L/x_l))
     elif bed_profile == 'Aletschglacier':
-      	return b0-s_A1*8033./2.-s_A2*(L-8033.)/2.
+        if L < 8033:
+            return b0 - s_A1 * L / 2.
+        else:
+            return (8033 / L) * b0 - s_A1 * 8033 / 2. + (1 - 8033 / L) * b1 - s_A2 * (L - 8033) / 2.
     	
 def mean_s(L):
     """mean bed slope"""
@@ -66,8 +68,11 @@ def mean_s(L):
         return s 
     if bed_profile == 'concave':
         return b0*(1-np.exp(-L/x_l))/L
-    if bed_profile == 'Aletschglacier':
-      	return (8033.*s_A1+(L-8033.)*s_A2)/L
+    elif bed_profile == 'Aletschglacier':
+        if L<8033:
+            return s_A1
+        else:
+            return (8033.*s_A1+(L-8033.)*s_A2)/L
 
 def dmean_s_dL(L,x):
     """change of the mean bed slope with respect to glacier length"""
@@ -75,6 +80,11 @@ def dmean_s_dL(L,x):
         return 0
     elif bed_profile == 'concave':
         return -b0*(1-np.exp(-L/x_l))/L**2 + b0*x_l**(-1)/L
+    elif bed_profile == 'Aletschglacier':
+        if L < 8033:
+            return 0
+        else:
+            return 8033.*(s_A2-s_A1)/L**2
 
 def Bs(Hm,E,L):
     """Total surface mass budget"""  
@@ -213,8 +223,9 @@ W = 1. # m glacier width
 b0 = 3900. # upper bound bed elevation (m) for linear case, upper bound for concave case would be b0+ba
 ba = 0. # lower bound for concave bed profile
 s = 0.1 # Bed slope
-s_A1 = 0.1476401
-s_A2 = 0.0878518
+s_A1 = 0.1476401 #Bed slope upper part Aletschglacier
+s_A2 = 0.0878518 #Bed slope lower part Aletschgacier
+b1 = b0 - s_A1 * 8033 #bed elevation at slope division Aletschglacier
 nu = 10.
 alpha = 3. #m^0.5
 beta = 0.007 #m ice/a/m
@@ -232,7 +243,7 @@ c = 1. # 1/yr calving parameter
 dx = 100 #m
 dt = 1 #yr
 tmax = 100 #yr
-bed_profile = 'linear' # use 'linear' or 'concave' or 'Aletschglacier'
+bed_profile = 'Aletschglacier' # use 'linear' or 'concave' or 'Aletschglacier'
 ds_dl = 0.
 
 #set bottom slope glacier
