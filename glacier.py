@@ -5,9 +5,9 @@ from __future__ import print_function
 import numpy as np #This file is a preliminary version of the ice sheet model
 import matplotlib.pyplot as plt
 try: 
-	from types import NoneType
+    from types import NoneType
 except ImportError:
-	print("Cannot import NoneType")
+    print("Cannot import NoneType")
 # =============================================================================
 # Plot functions
 # ============================================================================= 
@@ -64,7 +64,7 @@ def mean_b(L):
             return b0 - s_A1 * L / 2.
         else:
             return (8033 / L) * b0 - s_A1 * 8033 / 2. + (1 - 8033 / L) * b1 - s_A2 * (L - 8033) / 2.
-    	
+        
 def mean_s(L):
     """mean bed slope"""
     if bed_profile == 'linear':
@@ -116,6 +116,31 @@ def integrate(L_prev,Hm_prev,Bs_prev,F_prev,E):
     Bs_new = Bs(Hm_new,E,L_new)
     F_new = F(Hm_new)    
     return L_new, Hm_new, Bs_new, F_new
+
+def calc_glacier(tmax,E,dT_dt=0,dE_dT=0,L_0=0.01):
+    """ Compute evolution of the glacier.
+    Returns Bs_arr, Hm_arr, F_arr, L_arr
+    
+    :param tmax:       integration time
+    :E:                initial equilibrium height
+    :dT_dt:            temperature change per year
+    :dE_dT:            change in equilibrium height per temperature change
+    :L_0:              initial glacier length
+    """
+    Bs_arr = np.zeros(tmax)
+    Hm_arr = np.zeros(tmax)
+    F_arr = np.zeros(tmax)
+    L_arr = np.zeros(tmax)
+
+    L_arr[0] = L_0 # L_2014
+    
+    E = E
+    for i in range(tmax-1):
+        L_arr[i+1], Hm_arr[i+1], Bs_arr[i+1], F_arr[i+1] = \
+        integrate(L_arr[i],Hm_arr[i],Bs_arr[i],F_arr[i],E)
+        E = E + dE_dT * dT_dt
+
+    return Bs_arr, Hm_arr, F_arr, L_arr
   
 def steady_state(E, L_0=0.001, min_dL_dt=0.1):
     """Returns year when steady-state is reached.
@@ -155,7 +180,7 @@ def efolding(E,L_0):
     L_arr[0] = L_0
     for i in range(t_ss-1):
         L_arr[i+1], Hm_arr[i+1], Bs_arr[i+1], F_arr[i+1] = \
-        integrate(L_arr[i],Hm_arr[i],Bs_arr[i],F_arr[i])  
+        integrate(L_arr[i],Hm_arr[i],Bs_arr[i],F_arr[i],E)  
     L_diff = abs(L_arr-L_efold)
 
     t_efold = np.where(L_diff==min(L_diff))[0][0]*dt
@@ -187,7 +212,7 @@ def find_current_ELA(L_today, dE = 50.):
         # newton method 
         correction =  L_diff1/deriv_L_diff
         E_current = E_current - correction
-  	
+      
     return E_current
   
 def project_ELA(year,dT_dt,current_ELA=None):
@@ -205,6 +230,26 @@ def read_ELA():
     years = data[:,0]
     ELA_perturbation = data[:,1]
     return years, ELA_perturbation
+
+def E_dependence(L_0=0.001, min_dL_dt=0.1):
+  """ Returns equilibrium glacier length and integration time for
+      different values of E
+  """
+  E_arr = np.arange(1000,4000,10)
+  tmax_arr,lmax_arr = map(list,zip(*[steady_state(E,L_0,min_dL_dt) for E in E_arr]))
+  tmax_arr = np.array(tmax_arr)
+  lmax_arr = np.array(lmax_arr)
+  return E_arr, tmax_arr, lmax_arr
+
+def E_vs_efolding(ref_E):
+  """ Calculate efolding timescales for different values of E when 
+      the glacier length is the equilibrium length calculated
+      from a reference value of E (E0)
+  """
+  i, L_equil = steady_state(ref_E)
+  E_arr = np.arange(1000,4000,10)
+  t_efold_arr = np.array([efolding(E,L_equil)for E in E_arr])
+  return E_arr, t_efold_arr
 
 # =============================================================================
 # Constants 
@@ -262,19 +307,8 @@ dE_dT = 110.  # change of the ELA per temperature change m/K
 # =============================================================================
 # Main programm
 # =============================================================================
-Bs_arr = np.zeros(tmax)
-Hm_arr = np.zeros(tmax)
-F_arr = np.zeros(tmax)
-L_arr = np.zeros(tmax)
-
-# constant equilibrium height
-E = E0
 
 # initialize a first glacier
-L_arr[0] = 0.01 # L_2014
-
-for i in range(tmax-1):
-    L_arr[i+1], Hm_arr[i+1], Bs_arr[i+1], F_arr[i+1] = \
-    integrate(L_arr[i],Hm_arr[i],Bs_arr[i],F_arr[i],E)  
+Bs_arr, Hm_arr, F_arr, L_arr = calc_glacier(tmax,E0)
 
 plot_results()
