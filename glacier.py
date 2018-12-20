@@ -4,7 +4,10 @@ from __future__ import print_function
 
 import numpy as np #This file is a preliminary version of the ice sheet model
 import matplotlib.pyplot as plt
-from types import NoneType
+try: 
+	from types import NoneType
+except ImportError:
+	print("Cannot import NoneType")
 # =============================================================================
 # Plot functions
 # ============================================================================= 
