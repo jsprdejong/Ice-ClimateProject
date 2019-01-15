@@ -329,7 +329,7 @@ c = 1. # 1/yr calving parameter
 dx = 100 #m
 dt = 1 #yr
 tmax = 100 #yr
-bed_profile = 'Aletschglacier' # use 'linear' or 'concave' or 'Aletschglacier'
+bed_profile = 'linear' # use 'linear' or 'concave' or 'Aletschglacier'
 ds_dl = 0.
 
 #set bottom slope glacier
