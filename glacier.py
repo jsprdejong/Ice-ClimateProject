@@ -142,48 +142,88 @@ def calc_glacier(tmax,E,dT_dt=0,dE_dT=0,L_0=0.01):
 
     return Bs_arr, Hm_arr, F_arr, L_arr
   
-def steady_state(E, L_0=0.001, min_dL_dt=0.1):
-    """Returns year when steady-state is reached.
+#def steady_state2(E, L_0=0.001, min_dL_dt=0.1):
+#    """Returns year and length when steady-state is reached.
+#    
+#    :param E:          equilibrium line height
+#    :param L_0:        initial glacier length (default=0.001)
+#    :param min_dL_dt:  goal in difference in glacier length to 
+#                       achieve equilibrium
+#    """
+#    Bs_0 = 0
+#    Hm_0 = 0
+#    F_0= 0
+#    i = 0
+#    L_new, Hm_new, Bs_new, F_new = integrate(L_0,Hm_0,Bs_0,F_0,E)
+#    
+#    while abs(dL_dt(L_new,Bs_new,F_new)) > min_dL_dt or i<100:
+#        L_prev = L_new
+#        Hm_prev = Hm_new
+#        Bs_prev = Bs_new
+#        F_prev = F_new
+#        L_new, Hm_new, Bs_new, F_new = integrate(L_prev,Hm_prev,Bs_prev,F_prev,E)
+#        i+=1
+#        
+#    return i, L_new
+
+def steady_state(E, L_0=0.001, Delta_L = 10., nu=0.1):
     
-    :param E:          equilibrium line height
-    :param L_0:        initial glacier length (default=0.001)
-    :param min_dL_dt:  goal in difference in glacier length to 
-                       achieve equilibrium
-    """
-    Bs_0 = 0
-    Hm_0 = 0
-    F_0= 0
-    i = 0
-    L_new, Hm_new, Bs_new, F_new = integrate(L_0,Hm_0,Bs_0,F_0,E)
-    while dL_dt(L_new,Bs_new,F_new) > min_dL_dt or i<10:
-        L_prev = L_new
-        Hm_prev = Hm_new
-        Bs_prev = Bs_new
-        F_prev = F_new
-        L_new, Hm_new, Bs_new, F_new = integrate(L_prev,Hm_prev,Bs_prev,F_prev,E)
-        i+=1
-    return i, L_new
+    Hm_0 = Hm(L_0)
+    Bs_0 = Bs(Hm_0,E,L_0)
+    F_0 = F(Hm_0) 
+    
+    for i in range(300):
+        L_0, Hm_0, Bs_0, F_0 = integrate(L_0,Hm_0,Bs_0,F_0,E)
+    
+    correction = 1000.
+    while abs(correction) > 1.:
+        Hm_0 = Hm(L_0)
+        Bs_0 = Bs(Hm_0,E,L_0)
+        F_0 = F(Hm_0) 
+        
+        L_1 = L_0 + Delta_L
+        Hm_1 = Hm(L_1)
+        Bs_1 = Bs(Hm_1,E,L_1)
+        F_1 = F(Hm_1)  
+    
+        dL_dt0 = dL_dt(L_0,Bs_0,F_0)
+        dL_dt1 = dL_dt(L_1,Bs_1,F_1)
+        
+        ddL_dtdL = (dL_dt1 - dL_dt0)/Delta_L 
+        
+        correction = dL_dt0/ddL_dtdL
+        L_0 = L_0 - nu * correction
+        if L_0 <=0.:
+            L_0 = 0
+            break
+    
+    return L_0
+    
   
-def efolding(E,L_0):
-    """Returns e-folding timescale.
+def efolding(E,L_ref):
+    """Returns e-folding timescale for the adjustment to a new equilibium height (E).
     
-    :param E: equilibrium line height
-    :param L_0: initial glacier length
+    :param E: new equilibrium line height
+    :param L_ref: glacier length for an reference equilibrium height
     """
-    t_ss, L_ss = steady_state(E,L_0)
-    L_efold = (1-1/np.exp(1))*(L_ss-L_0)+L_0
+    L_ss = steady_state(E,L_ref)
+    
+    if abs(L_ss - L_ref)<10:
+        return np.nan
+    
+    L_efold =  (1 - np.exp(-1)) * (L_ss - L_ref) + L_ref
 
-    Bs_arr = np.zeros(t_ss)
-    Hm_arr = np.zeros(t_ss)
-    F_arr = np.zeros(t_ss)
-    L_arr = np.zeros(t_ss)
-    L_arr[0] = L_0
-    for i in range(t_ss-1):
-        L_arr[i+1], Hm_arr[i+1], Bs_arr[i+1], F_arr[i+1] = \
-        integrate(L_arr[i],Hm_arr[i],Bs_arr[i],F_arr[i],E)  
-    L_diff = abs(L_arr-L_efold)
-
-    t_efold = np.where(L_diff==min(L_diff))[0][0]*dt
+    L_new,L_old = L_ref,L_ref
+    H_new, B_new, F_new = 0,0,0
+    
+    t_efold = 0
+    
+    while (L_new > L_efold and L_old > L_efold) or (L_new < L_efold and L_old < L_efold):
+        L_old, H_old, B_old, F_old = L_new, H_new, B_new, F_new 
+        L_new, H_new, B_new, F_new = integrate(L_old, H_old, B_old, F_old,E)  
+        
+        t_efold+=1
+        
     return t_efold
   
 def find_current_ELA(L_today, dE = 50.):
@@ -199,11 +239,11 @@ def find_current_ELA(L_today, dE = 50.):
     L_diff1 = np.inf
     while L_diff1 >10.:
         # steady state for current ELA
-        year_steady1, L_steady1 = steady_state(E=E_current)
+        L_steady1 = steady_state(E=E_current)
         L_diff1 = L_steady1-L_today
         
         # steady state for perturbated ELA
-        year_steady2, L_steady2 = steady_state(E=E_current+dE)
+        L_steady2 = steady_state(E=E_current+dE)
         L_diff2 = L_steady2-L_today
         
         # derivative of the change
@@ -231,27 +271,25 @@ def read_ELA():
     ELA_perturbation = data[:,1]
     return years, ELA_perturbation
 
-def E_dependence(L_0=0.001, min_dL_dt=0.1):
+def E_fixed_points(L_0=0.001):
   """ Returns equilibrium glacier length and integration time for
       different values of E
   """
   E_arr = np.arange(1000,4000,10)
-  tmax_arr,lmax_arr = map(list,zip(*[steady_state(E,L_0,min_dL_dt) for E in E_arr]))
-  tmax_arr = np.array(tmax_arr)
-  lmax_arr = np.array(lmax_arr)
-  return E_arr, tmax_arr, lmax_arr
+  lmax_arr = np.array([steady_state(E,L_0) for E in E_arr])
+  return E_arr, lmax_arr
 
 def E_vs_efolding(ref_E):
   """ Calculate efolding timescales for different values of E when 
       the glacier length is the equilibrium length calculated
       from a reference value of E (E0)
   """
-  i, L_equil = steady_state(ref_E)
+  L_equil = steady_state(ref_E)
   E_arr = np.arange(1000,4000,10)
-  t_efold_arr = np.array([efolding(E,L_equil)for E in E_arr])
+  t_efold_arr = np.array([efolding(E,L_equil) for E in E_arr])
   return E_arr, t_efold_arr
 
-# =============================================================================
+#%% =============================================================================
 # Constants 
 # =============================================================================
 rho_w = 997. #kg/m3 density water
@@ -309,6 +347,19 @@ dE_dT = 110.  # change of the ELA per temperature change m/K
 # =============================================================================
 
 # initialize a first glacier
-Bs_arr, Hm_arr, F_arr, L_arr = calc_glacier(tmax,E0)
-
+Bs_arr, Hm_arr, F_arr, L_arr = calc_glacier(tmax,E0,L_0=1000.01)
 plot_results()
+
+plt.figure(2)
+plt.title("E-folding time ")
+plt.xlabel("E [m]")
+plt.ylabel("e-folding time [yr]")
+E_arr, t_efold_arr = E_vs_efolding(E0)
+plt.plot(E_arr, t_efold_arr)
+#
+plt.figure(3)
+plt.title("Stable steady state")
+plt.xlabel("E [m]")
+plt.ylabel("L [km]")
+E_arr, lmax_arr = E_fixed_points()
+plt.plot(E_arr, lmax_arr)
