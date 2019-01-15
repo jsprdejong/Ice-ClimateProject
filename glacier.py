@@ -117,7 +117,53 @@ def integrate(L_prev,Hm_prev,Bs_prev,F_prev,E):
     F_new = F(Hm_new)    
     return L_new, Hm_new, Bs_new, F_new
 
-def calc_glacier(tmax,E,dT_dt=0,dE_dT=0,L_0=0.01):
+def calc_glacier(E_guess):
+    """ Compute evolution of the glacier.
+    Returns Bs_arr, Hm_arr, F_arr, L_arr
+    
+    :param tmax:       integration time
+    :E:                initial equilibrium height (scalar or array)
+    :dT_dt:            temperature change per year
+    :dE_dT:            change in equilibrium height per temperature change
+    :L_0:              initial glacier length
+    """
+    # read ELA perturbations
+    years, dELA = read_ELA()
+    n_years = len(years)
+    
+    E_arr = np.zeros(n_years)
+    E_arr[:] = E_guess + dELA[:]
+    
+    Bs_arr = np.zeros(n_years)
+    Hm_arr = np.zeros(n_years)
+    F_arr = np.zeros(n_years)
+    L_arr = np.zeros(n_years)
+    
+    L_arr[0] = steady_state(E_guess) 
+    
+    for i in range(n_years-1):
+        L_arr[i+1], Hm_arr[i+1], Bs_arr[i+1], F_arr[i+1] = \
+        integrate(L_arr[i],Hm_arr[i],Bs_arr[i],F_arr[i],E_arr[i])
+    return L_arr[-1]
+
+def find_real_E0(E_guess,L_target, dE = 0.1, nu=0.005):
+    L_error1 = 10e5
+    
+    while abs(L_error1)>10.:
+        L1 = calc_glacier(E_guess)
+        L2 = calc_glacier(E_guess+dE)
+        
+        L_error1 = abs(L1 - L_target)
+        L_error2 = abs(L2 - L_target)
+        
+        derror1_dE = (L_error2-L_error1)/dE
+        
+        E_guess = E_guess - nu * L1 / derror1_dE
+        print(E_guess)
+       
+    return E_guess
+
+def project_future_glacier(tmax,E,dT_dt=0,dE_dT=0,L_0=0.01):
     """ Compute evolution of the glacier.
     Returns Bs_arr, Hm_arr, F_arr, L_arr
     
@@ -133,39 +179,14 @@ def calc_glacier(tmax,E,dT_dt=0,dE_dT=0,L_0=0.01):
     L_arr = np.zeros(tmax)
 
     L_arr[0] = L_0 # L_2014
-    
-    E = E
+
     for i in range(tmax-1):
         L_arr[i+1], Hm_arr[i+1], Bs_arr[i+1], F_arr[i+1] = \
         integrate(L_arr[i],Hm_arr[i],Bs_arr[i],F_arr[i],E)
         E = E + dE_dT * dT_dt
-
-    return Bs_arr, Hm_arr, F_arr, L_arr
+    
+    return L_arr
   
-#def steady_state2(E, L_0=0.001, min_dL_dt=0.1):
-#    """Returns year and length when steady-state is reached.
-#    
-#    :param E:          equilibrium line height
-#    :param L_0:        initial glacier length (default=0.001)
-#    :param min_dL_dt:  goal in difference in glacier length to 
-#                       achieve equilibrium
-#    """
-#    Bs_0 = 0
-#    Hm_0 = 0
-#    F_0= 0
-#    i = 0
-#    L_new, Hm_new, Bs_new, F_new = integrate(L_0,Hm_0,Bs_0,F_0,E)
-#    
-#    while abs(dL_dt(L_new,Bs_new,F_new)) > min_dL_dt or i<100:
-#        L_prev = L_new
-#        Hm_prev = Hm_new
-#        Bs_prev = Bs_new
-#        F_prev = F_new
-#        L_new, Hm_new, Bs_new, F_new = integrate(L_prev,Hm_prev,Bs_prev,F_prev,E)
-#        i+=1
-#        
-#    return i, L_new
-
 def steady_state(E, L_0=0.001, Delta_L = 10., nu=0.1):
     
     Hm_0 = Hm(L_0)
@@ -226,47 +247,47 @@ def efolding(E,L_ref):
         
     return t_efold
   
-def find_current_ELA(L_today, dE = 50.):
-    """This functions computes the current equlibirum height (ELA) 
-    based on the current glacier length
-    
-    :param L_today: current glacier length
-    :param dE: the pertubation of the ELA used in the newtons method (finite difference)
-    """
-    # initialize the ELA that is going to be found
-    E_current = E0
-    
-    L_diff1 = np.inf
-    while L_diff1 >10.:
-        # steady state for current ELA
-        L_steady1 = steady_state(E=E_current)
-        L_diff1 = L_steady1-L_today
-        
-        # steady state for perturbated ELA
-        L_steady2 = steady_state(E=E_current+dE)
-        L_diff2 = L_steady2-L_today
-        
-        # derivative of the change
-        deriv_L_diff = (L_diff2 - L_diff1)/dE
-        
-        # newton method 
-        correction =  L_diff1/deriv_L_diff
-        E_current = E_current - correction
-      
-    return E_current
-  
-def project_ELA(year,dT_dt,current_ELA=None):
-    """Projecting the evolution of the ELA
-    
-    :param year: year 
-    :param dT_dt: the change of temperature per year
-    """   
-    if type(current_ELA) == NoneType:
-        raise ValueError("The current ELA needs to be set or  computed!")
-    return current_ELA + dE_dT *  dT_dt * (year - base_year)
+#def find_current_ELA(L_today, dE = 50.):
+#    """This functions computes the current equlibirum height (ELA) 
+#    based on the current glacier length
+#    
+#    :param L_today: current glacier length
+#    :param dE: the pertubation of the ELA used in the newtons method (finite difference)
+#    """
+#    # initialize the ELA that is going to be found
+#    E_current = E0
+#    
+#    L_diff1 = np.inf
+#    while L_diff1 >10.:
+#        # steady state for current ELA
+#        L_steady1 = steady_state(E=E_current)
+#        L_diff1 = L_steady1-L_today
+#        
+#        # steady state for perturbated ELA
+#        L_steady2 = steady_state(E=E_current+dE)
+#        L_diff2 = L_steady2-L_today
+#        
+#        # derivative of the change
+#        deriv_L_diff = (L_diff2 - L_diff1)/dE
+#        
+#        # newton method 
+#        correction =  L_diff1/deriv_L_diff
+#        E_current = E_current - correction
+#      
+#    return E_current
+#  
+#def project_ELA(year,dT_dt,current_ELA=None):
+#    """Projecting the evolution of the ELA
+#    
+#    :param year: year 
+#    :param dT_dt: the change of temperature per year
+#    """   
+#    if type(current_ELA) == NoneType:
+#        raise ValueError("The current ELA needs to be set or  computed!")
+#    return current_ELA + dE_dT *  dT_dt * (year - base_year)
   
 def read_ELA():
-    data = np.load("ELA.txt")
+    data = np.loadtxt("ELA.txt")
     years = data[:,0]
     ELA_perturbation = data[:,1]
     return years, ELA_perturbation
@@ -329,7 +350,7 @@ c = 1. # 1/yr calving parameter
 dx = 100 #m
 dt = 1 #yr
 tmax = 100 #yr
-bed_profile = 'linear' # use 'linear' or 'concave' or 'Aletschglacier'
+bed_profile = 'Aletschglacier' # use 'linear' or 'concave' or 'Aletschglacier'
 ds_dl = 0.
 
 #set bottom slope glacier
@@ -347,7 +368,7 @@ dE_dT = 110.  # change of the ELA per temperature change m/K
 # =============================================================================
 
 # initialize a first glacier
-Bs_arr, Hm_arr, F_arr, L_arr = calc_glacier(tmax,E0,L_0=1000.01)
+L_arr = project_future_glacier(tmax,E0,L_0=0.01)
 plot_results()
 
 plt.figure(2)
@@ -356,10 +377,12 @@ plt.xlabel("E [m]")
 plt.ylabel("e-folding time [yr]")
 E_arr, t_efold_arr = E_vs_efolding(E0)
 plt.plot(E_arr, t_efold_arr)
+plt.savefig("efolding.png")
 #
 plt.figure(3)
 plt.title("Stable steady state")
 plt.xlabel("E [m]")
 plt.ylabel("L [km]")
 E_arr, lmax_arr = E_fixed_points()
-plt.plot(E_arr, lmax_arr)
+plt.plot(E_arr, lmax_arr/1000)
+plt.savefig("steady_states.png")
