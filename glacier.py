@@ -127,6 +127,8 @@ def calc_glacier(E_guess):
     :dE_dT:            change in equilibrium height per temperature change
     :L_0:              initial glacier length
     """
+    
+    
     # read ELA perturbations
     years, dELA = read_ELA()
     n_years = len(years)
@@ -144,23 +146,29 @@ def calc_glacier(E_guess):
     for i in range(n_years-1):
         L_arr[i+1], Hm_arr[i+1], Bs_arr[i+1], F_arr[i+1] = \
         integrate(L_arr[i],Hm_arr[i],Bs_arr[i],F_arr[i],E_arr[i])
-    return L_arr[-1]
+    return L_arr, years
 
 def find_real_E0(E_guess,L_target, dE = 0.1, nu=0.005):
     L_error1 = 10e5
+    E_new = E_guess
     
     while abs(L_error1)>10.:
-        L1 = calc_glacier(E_guess)
-        L2 = calc_glacier(E_guess+dE)
+        
+        E_guess = E_new
+        
+        L1arr, dummy = calc_glacier(E_guess)
+        L2arr, dummy = calc_glacier(E_guess+dE)
+        
+        L1 = L1arr[-1]
+        L2 = L2arr[-1]
         
         L_error1 = abs(L1 - L_target)
         L_error2 = abs(L2 - L_target)
         
         derror1_dE = (L_error2-L_error1)/dE
         
-        E_guess = E_guess - nu * L1 / derror1_dE
-        print(E_guess)
-       
+        E_new = E_guess - nu * L1 / derror1_dE
+    
     return E_guess
 
 def project_future_glacier(tmax,E,dT_dt=0,dE_dT=0,L_0=0.01):
@@ -288,8 +296,8 @@ def efolding(E,L_ref):
   
 def read_ELA():
     data = np.loadtxt("ELA.txt")
-    years = data[:,0]
-    ELA_perturbation = data[:,1]
+    years = data[:-4,0]
+    ELA_perturbation = data[:-4,1]
     return years, ELA_perturbation
 
 def E_fixed_points(L_0=0.001):
@@ -386,3 +394,10 @@ plt.ylabel("L [km]")
 E_arr, lmax_arr = E_fixed_points()
 plt.plot(E_arr, lmax_arr/1000)
 plt.savefig("steady_states.png")
+
+
+E0 = find_real_E0(2900.,21500.)
+L_arr, year_arr = calc_glacier(E0)
+
+plt.figure(4)
+plt.plot(year_arr,L_arr)
