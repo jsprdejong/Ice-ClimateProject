@@ -13,24 +13,24 @@ except ImportError:
 # ============================================================================= 
 def plot_results():
     plt.close("all")
-    fig, ax = plt.subplots(nrows=1,ncols=2)
-    fig.set_size_inches(12,6)
-    ax[0].set_title("bed profile: "+str(bed_profile))
+    fig, ax = plt.subplots(nrows=1, ncols=2)
+    fig.set_size_inches(12, 6)
+    ax[0].set_title("bed profile: " + str(bed_profile))
     ax[0].set_xlabel("x[km]")
     ax[0].set_ylabel("elevation[km]")
     
     b_arr = b(x_arr)
-    ax[0].plot(x_arr/1000.,b_arr/1000.,"k")
+    ax[0].plot(x_arr/1000., b_arr/1000., "k")
     
-    ax[0].set_xlim(0,max(x_arr/1000.))
-    ax[0].set_ylim(0,max(b_arr/1000.)*1.1)
+    ax[0].set_xlim(0, max(x_arr/1000.))
+    ax[0].set_ylim(0, max(b_arr/1000.) * 1.1)
 
     ax[1].set_title("glacier length evolution, profile: "+str(bed_profile))
     ax[1].set_xlabel("time[yr]")
     ax[1].set_ylabel("length[km]")
-    ax[1].plot(t_arr,L_arr/1000.)
-    ax[1].set_xlim(0,max(t_arr))
-    ax[1].set_ylim(0,max(L_arr/1000)*1.1)
+    ax[1].plot(t_arr, L_arr/1000.)
+    ax[1].set_xlim(0, max(t_arr))
+    ax[1].set_ylim(0, max(L_arr/1000) * 1.1)
     plt.show()
 
 # =============================================================================
@@ -40,7 +40,7 @@ def plot_results():
 def Hm(L):
     """mean glacier thickness"""
     mean_s_value = mean_s(L)
-    return alpha/(1.+ nu*mean_s_value) * np.sqrt(L)
+    return alpha/(1. + nu*mean_s_value) * np.sqrt(L)
 
 def b(x):
     """bed elevation"""
@@ -56,9 +56,9 @@ def b(x):
   
 def mean_b(L):
     if bed_profile == 'linear':
-        return b0 - s*L/2.
+        return b0 - s * L/2.
     elif bed_profile == 'concave':
-        return ba + x_l*b0/L*(1-np.exp(-L/x_l))
+        return ba + x_l * b0/L*(1-np.exp(-L/x_l))
     elif bed_profile == 'Aletschglacier':
         if L < 8033:
             return b0 - s_A1 * L / 2.
@@ -75,9 +75,9 @@ def mean_s(L):
         if L<8033:
             return s_A1
         else:
-            return (8033.*s_A1+(L-8033.)*s_A2)/L
+            return (8033.*s_A1 + (L-8033.)*s_A2)/L
 
-def dmean_s_dL(L,x):
+def dmean_s_dL(L, x):
     """change of the mean bed slope with respect to glacier length"""
     if bed_profile == 'linear':
         return 0
@@ -89,17 +89,17 @@ def dmean_s_dL(L,x):
         else:
             return 8033.*(s_A2-s_A1)/L**2
 
-def Bs(Hm,E,L):
+def Bs(Hm, E, L):
     """Total surface mass budget"""  
     mean_b_value = mean_b(L)
     return beta * (mean_b_value + Hm - E) * W * L
   
 def F(Hm):
     """"calving"""
-    Hf= max(kappa*Hm, d*rho_w/rho_i) #ice thickness at glacier front
-    return -c*d*Hf*W
+    Hf= max(kappa * Hm, d * rho_w/rho_i) #ice thickness at glacier front
+    return -c * d * Hf * W
 
-def dL_dt(L,Bs,F):
+def dL_dt(L, Bs, F):
     """prognostic equation for glacier length"""
     mean_s_value = mean_s(L)  
     return (3. * alpha / (2. * (1. + nu * mean_s_value)) * L**(1./2.) \
@@ -109,7 +109,7 @@ def dL_dt(L,Bs,F):
 # =============================================================================
 # Glacier Tools
 # =============================================================================
-def integrate(L_prev,Hm_prev,Bs_prev,F_prev,E):
+def integrate(L_prev, Hm_prev, Bs_prev, F_prev,E):
     """Integrate one timestep"""
     L_new = L_prev + dL_dt(L_prev,Bs_prev,F_prev)*dt
     Hm_new = Hm(L_new)
@@ -127,7 +127,6 @@ def calc_glacier(E_guess):
     :dE_dT:            change in equilibrium height per temperature change
     :L_0:              initial glacier length
     """
-    
     
     # read ELA perturbations
     years, dELA = read_ELA()
@@ -148,7 +147,7 @@ def calc_glacier(E_guess):
         integrate(L_arr[i],Hm_arr[i],Bs_arr[i],F_arr[i],E_arr[i])
     return L_arr, years
 
-def find_real_E0(E_guess,L_target, dE = 0.1, nu=0.005):
+def find_real_E0(E_guess, L_target, dE = 0.1, nu = 0.005):
     L_error1 = 10e5
     E_new = E_guess
     
@@ -171,7 +170,8 @@ def find_real_E0(E_guess,L_target, dE = 0.1, nu=0.005):
     
     return E_guess
 
-def project_future_glacier(tmax,E,dT_dt=0,dE_dT=0,L_0=0.01):
+def project_future_glacier(tmax, E, dT_dt=0, dE_dT=0, L_0=0.01, \
+                           year_start = False, year_stab = False):
     """ Compute evolution of the glacier.
     Returns Bs_arr, Hm_arr, F_arr, L_arr
     
@@ -181,6 +181,12 @@ def project_future_glacier(tmax,E,dT_dt=0,dE_dT=0,L_0=0.01):
     :dE_dT:            change in equilibrium height per temperature change
     :L_0:              initial glacier length
     """
+    
+    if year_start != False:
+        years = np.arange(year_start, year_start + tmax,1)
+    else:
+        years = np.arange(0, tmax, 1)
+    
     Bs_arr = np.zeros(tmax)
     Hm_arr = np.zeros(tmax)
     F_arr = np.zeros(tmax)
@@ -188,13 +194,16 @@ def project_future_glacier(tmax,E,dT_dt=0,dE_dT=0,L_0=0.01):
 
     L_arr[0] = L_0 # L_2014
 
-    for i in range(tmax-1):
+    for i in range(tmax - 1):
+        if year_stab!=False:
+            if years[i] == year_stab:
+                dT_dt = 0
         L_arr[i+1], Hm_arr[i+1], Bs_arr[i+1], F_arr[i+1] = \
         integrate(L_arr[i],Hm_arr[i],Bs_arr[i],F_arr[i],E)
         E = E + dE_dT * dT_dt
     
-    return L_arr
-  
+    return L_arr, years
+
 def steady_state(E, L_0=0.001, Delta_L = 10., nu=0.1):
     
     Hm_0 = Hm(L_0)
@@ -202,48 +211,46 @@ def steady_state(E, L_0=0.001, Delta_L = 10., nu=0.1):
     F_0 = F(Hm_0) 
     
     for i in range(300):
-        L_0, Hm_0, Bs_0, F_0 = integrate(L_0,Hm_0,Bs_0,F_0,E)
+        L_0, Hm_0, Bs_0, F_0 = integrate(L_0, Hm_0, Bs_0, F_0, E)
     
     correction = 1000.
     while abs(correction) > 1.:
         Hm_0 = Hm(L_0)
-        Bs_0 = Bs(Hm_0,E,L_0)
+        Bs_0 = Bs(Hm_0, E, L_0)
         F_0 = F(Hm_0) 
         
         L_1 = L_0 + Delta_L
         Hm_1 = Hm(L_1)
-        Bs_1 = Bs(Hm_1,E,L_1)
+        Bs_1 = Bs(Hm_1, E, L_1)
         F_1 = F(Hm_1)  
     
-        dL_dt0 = dL_dt(L_0,Bs_0,F_0)
-        dL_dt1 = dL_dt(L_1,Bs_1,F_1)
+        dL_dt0 = dL_dt(L_0, Bs_0, F_0)
+        dL_dt1 = dL_dt(L_1, Bs_1, F_1)
         
         ddL_dtdL = (dL_dt1 - dL_dt0)/Delta_L 
         
         correction = dL_dt0/ddL_dtdL
         L_0 = L_0 - nu * correction
-        if L_0 <=0.:
+        if L_0 <= 0.:
             L_0 = 0
             break
-    
     return L_0
-    
   
-def efolding(E,L_ref):
+def efolding(E, L_ref):
     """Returns e-folding timescale for the adjustment to a new equilibium height (E).
     
     :param E: new equilibrium line height
     :param L_ref: glacier length for an reference equilibrium height
     """
-    L_ss = steady_state(E,L_ref)
+    L_ss = steady_state(E, L_ref)
     
-    if abs(L_ss - L_ref)<10:
+    if abs(L_ss - L_ref) < 10:
         return np.nan
     
     L_efold =  (1 - np.exp(-1)) * (L_ss - L_ref) + L_ref
 
     L_new,L_old = L_ref,L_ref
-    H_new, B_new, F_new = 0,0,0
+    H_new, B_new, F_new = 0, 0, 0
     
     t_efold = 0
     
@@ -304,7 +311,7 @@ def E_fixed_points(L_0=0.001):
   """ Returns equilibrium glacier length and integration time for
       different values of E
   """
-  E_arr = np.arange(1000,4000,10)
+  E_arr = np.arange(1000, 4000, 10)
   lmax_arr = np.array([steady_state(E,L_0) for E in E_arr])
   return E_arr, lmax_arr
 
@@ -314,7 +321,7 @@ def E_vs_efolding(ref_E):
       from a reference value of E (E0)
   """
   L_equil = steady_state(ref_E)
-  E_arr = np.arange(1000,4000,10)
+  E_arr = np.arange(1000, 4000, 10)
   t_efold_arr = np.array([efolding(E,L_equil) for E in E_arr])
   return E_arr, t_efold_arr
 
@@ -327,10 +334,9 @@ rho_i = 917. #kg/m3 density ice
 # =============================================================================
 # Settings for the glacier model
 # =============================================================================
-
 # Aletschgletscher data
 base_year = 2014 # year of measurement of the glacier length
-L_2014 = 23000 # Length in 2014 (m)
+L_2014 = 21500 # Length in 2014 (m)
 E0 = 2900. # height equilibrium line t=0 (m)
 W = 1. # m glacier width
 
@@ -376,7 +382,7 @@ dE_dT = 110.  # change of the ELA per temperature change m/K
 # =============================================================================
 
 # initialize a first glacier
-L_arr = project_future_glacier(tmax,E0,L_0=0.01)
+L_arr, years = project_future_glacier(tmax,E0,L_0=0.01)
 plot_results()
 
 plt.figure(2)
@@ -385,7 +391,7 @@ plt.xlabel("E [m]")
 plt.ylabel("e-folding time [yr]")
 E_arr, t_efold_arr = E_vs_efolding(E0)
 plt.plot(E_arr, t_efold_arr)
-plt.savefig("efolding.png")
+plt.savefig("efolding.png",dpi=300)
 #
 plt.figure(3)
 plt.title("Stable steady state")
@@ -393,11 +399,44 @@ plt.xlabel("E [m]")
 plt.ylabel("L [km]")
 E_arr, lmax_arr = E_fixed_points()
 plt.plot(E_arr, lmax_arr/1000)
-plt.savefig("steady_states.png")
-
+plt.savefig("steady_states.png",dpi=300)
 
 E0 = find_real_E0(2900.,21500.)
 L_arr, year_arr = calc_glacier(E0)
 
 plt.figure(4)
 plt.plot(year_arr,L_arr)
+plt.title("Historical Glacier Length Evolution")
+plt.xlabel("t [yr]")
+plt.ylabel("L [km]")
+plt.savefig("historical_glacier.png",dpi=300)
+
+E_2014 = E0 + read_ELA()[1][-1]
+y_start = 2014
+y_end = 2150
+y_stab = 2100
+L_arr_future_001, years_future = \
+project_future_glacier(y_end-y_start, E_2014, 0.01, 110, L_2014, y_start, y_stab)
+L_arr_future_002, years_future = \
+project_future_glacier(y_end-y_start, E_2014, 0.02, 110, L_2014, y_start, y_stab)
+L_arr_future_004, years_future = \
+project_future_glacier(y_end-y_start, E_2014, 0.04, 110, L_2014, y_start, y_stab)
+
+plt.figure(5)
+plt.title("Glacier Length Evolution under Climate Change Scenarios")
+plt.xlabel("t [yr]")
+plt.ylabel("L [km]")
+plt.axvline(y_stab, linestyle='--', c='red', label='stabilization year')
+plt.plot(years_future, L_arr_future_001, label='0.01 K/a')
+plt.plot(years_future, L_arr_future_002, label='0.02 K/a')
+plt.plot(years_future, L_arr_future_004, label='0.04 K/a')
+plt.legend()
+plt.savefig("future_glacier.png", dpi=300)
+
+ELA_years, ELA_perturbation = read_ELA()
+plt.figure(6)
+plt.title("Equilibrium Line Altitude Data")
+plt.xlabel("t [yr]")
+plt.ylabel("ELA perturbation (m)")
+plt.plot(ELA_years, ELA_perturbation)
+plt.savefig("ELA_evolution.png",dpi=300)
