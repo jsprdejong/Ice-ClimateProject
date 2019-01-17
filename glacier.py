@@ -12,7 +12,7 @@ except ImportError:
 # Plot functions
 # ============================================================================= 
 def plot_results():
-    plt.close("all")
+    #plt.close("all")
     fig, ax = plt.subplots(nrows=1,ncols=2)
     fig.set_size_inches(12,6)
     ax[0].set_title("bed profile: "+str(bed_profile))
@@ -53,6 +53,9 @@ def b(x):
         bed[x < 8033] = b0 - s_A1 * x[x < 8033]
         bed[x >= 8033] = b1 - s_A2 * (x[x >= 8033] - 8033)
         return bed
+    
+def balance_rate(x,E,Hm):
+    return beta*(b(x) - E + Hm)
   
 def mean_b(L):
     if bed_profile == 'linear':
@@ -75,37 +78,81 @@ def mean_s(L):
         if L<8033:
             return s_A1
         else:
-            return (8033.*s_A1+(L-8033.)*s_A2)/L
+            return (8033.*s_A1 + (L-8033.)*s_A2) / L
 
-def dmean_s_dL(L,x):
+def dmean_s_dL(L):
     """change of the mean bed slope with respect to glacier length"""
     if bed_profile == 'linear':
         return 0
     elif bed_profile == 'concave':
-        return -b0*(1-np.exp(-L/x_l))/L**2 + b0*x_l**(-1)/L
+        return -b0*(1-np.exp(-L/x_l))/L**2 + b0*x_l**(-1)/L*np.exp(-L/x_l)
+    
     elif bed_profile == 'Aletschglacier':
-        if L < 8033:
-            return 0
-        else:
-            return 8033.*(s_A2-s_A1)/L**2
+        return np.heaviside(L-8033.,0)*8033.*(s_A2-s_A1)/L**2
+
 
 def Bs(Hm,E,L):
     """Total surface mass budget"""  
+
+    x = np.linspace(0,L,100)[1:]
+    Delta_x = x[2] - x[1]
+    
+    W_arr = W_function(x)
+    
+    dot_b_arr = balance_rate(x,E,Hm)
+    
+    Delta_Bs_arr = np.zeros(len(W_arr))
+    
+    Delta_Bs_arr[:] = W_arr[:] * dot_b_arr[:] * Delta_x 
+    
+    Bs_sum = np.sum(Delta_Bs_arr)
     mean_b_value = mean_b(L)
-    return beta * (mean_b_value + Hm - E) * W * L
+    #return beta * (mean_b_value + Hm - E) * 1 * L
+    return Bs_sum
+
   
-def F(Hm):
+def F(Hm,L):
     """"calving"""
     Hf= max(kappa*Hm, d*rho_w/rho_i) #ice thickness at glacier front
+    W = Wm(L)
     return -c*d*Hf*W
-
+##
 def dL_dt(L,Bs,F):
     """prognostic equation for glacier length"""
-    mean_s_value = mean_s(L)  
+    mean_s_value = mean_s(L)
+    dmean_s_dL_value = dmean_s_dL(L)
+    
     return (3. * alpha / (2. * (1. + nu * mean_s_value)) * L**(1./2.) \
-    - alpha * nu / (1. + nu * mean_s_value)**2. * L**(3./2.) * ds_dl)**(-1.)\
-    * (Bs + F)
+    - alpha * nu / (1. + nu * mean_s_value)**2. * L**(3./2.) * dmean_s_dL_value)**(-1.)\
+    * (Bs + F)/1
   
+def dL_dt2(L,Bs,F):
+    """prognostic equation for glacier length"""
+    return (Bs + F)/Psi(L)
+    
+def Psi(L):
+    mean_s_value = mean_s(L)
+    dmean_s_dL_value = dmean_s_dL(L)
+    
+    Wm_value = Wm(L)
+    dWm_dt_coef_value = dWm_dt_coef(L)
+    A = 3. * alpha /(2. * (1. + nu * mean_s_value)) * L**(1./2.) * Wm_value
+    B = alpha/(1+nu*mean_s_value)*L**(3/2)* dWm_dt_coef_value
+    C = - alpha * nu / (1. + nu * mean_s_value)**2. * L**(3./2.) * Wm_value * dmean_s_dL_value
+    
+    return A+B+C
+
+def W_function(x):
+    return w0 + w1 * x *np.exp(-a*x)
+
+def Wm(L):
+    """ glacier width function"""
+    return w0 + w1*a**(-2)*(L**(-1) - a* np.exp(-a*L) -L**(-1)*np.exp(-a*L))
+
+def dWm_dt_coef(L):
+    """returns the coefficent C in dWm/dt = C dL/dt"""
+    return w1 * (- a**(-2)*L**(-2) + np.exp(-a*L) + a**(-2) * L**(-2) *np.exp(-a*L) + a**(-1)*L**(-1)*np.exp(-a*L))
+
 # =============================================================================
 # Glacier Tools
 # =============================================================================
@@ -114,7 +161,7 @@ def integrate(L_prev,Hm_prev,Bs_prev,F_prev,E):
     L_new = L_prev + dL_dt(L_prev,Bs_prev,F_prev)*dt
     Hm_new = Hm(L_new)
     Bs_new = Bs(Hm_new,E,L_new)
-    F_new = F(Hm_new)    
+    F_new = F(Hm_new,L_new)    
     return L_new, Hm_new, Bs_new, F_new
 
 def calc_glacier(E_guess):
@@ -199,21 +246,21 @@ def steady_state(E, L_0=0.001, Delta_L = 10., nu=0.1):
     
     Hm_0 = Hm(L_0)
     Bs_0 = Bs(Hm_0,E,L_0)
-    F_0 = F(Hm_0) 
+    F_0 = F(Hm_0,L_0) 
     
     for i in range(300):
         L_0, Hm_0, Bs_0, F_0 = integrate(L_0,Hm_0,Bs_0,F_0,E)
     
     correction = 1000.
-    while abs(correction) > 1.:
+    while abs(correction) > 10.:
         Hm_0 = Hm(L_0)
         Bs_0 = Bs(Hm_0,E,L_0)
-        F_0 = F(Hm_0) 
+        F_0 = F(Hm_0,L_0) 
         
         L_1 = L_0 + Delta_L
         Hm_1 = Hm(L_1)
         Bs_1 = Bs(Hm_1,E,L_1)
-        F_1 = F(Hm_1)  
+        F_1 = F(Hm_1,L_1)  
     
         dL_dt0 = dL_dt(L_0,Bs_0,F_0)
         dL_dt1 = dL_dt(L_1,Bs_1,F_1)
@@ -255,45 +302,6 @@ def efolding(E,L_ref):
         
     return t_efold
   
-#def find_current_ELA(L_today, dE = 50.):
-#    """This functions computes the current equlibirum height (ELA) 
-#    based on the current glacier length
-#    
-#    :param L_today: current glacier length
-#    :param dE: the pertubation of the ELA used in the newtons method (finite difference)
-#    """
-#    # initialize the ELA that is going to be found
-#    E_current = E0
-#    
-#    L_diff1 = np.inf
-#    while L_diff1 >10.:
-#        # steady state for current ELA
-#        L_steady1 = steady_state(E=E_current)
-#        L_diff1 = L_steady1-L_today
-#        
-#        # steady state for perturbated ELA
-#        L_steady2 = steady_state(E=E_current+dE)
-#        L_diff2 = L_steady2-L_today
-#        
-#        # derivative of the change
-#        deriv_L_diff = (L_diff2 - L_diff1)/dE
-#        
-#        # newton method 
-#        correction =  L_diff1/deriv_L_diff
-#        E_current = E_current - correction
-#      
-#    return E_current
-#  
-#def project_ELA(year,dT_dt,current_ELA=None):
-#    """Projecting the evolution of the ELA
-#    
-#    :param year: year 
-#    :param dT_dt: the change of temperature per year
-#    """   
-#    if type(current_ELA) == NoneType:
-#        raise ValueError("The current ELA needs to be set or  computed!")
-#    return current_ELA + dE_dT *  dT_dt * (year - base_year)
-  
 def read_ELA():
     data = np.loadtxt("ELA.txt")
     years = data[:-4,0]
@@ -332,12 +340,16 @@ rho_i = 917. #kg/m3 density ice
 base_year = 2014 # year of measurement of the glacier length
 L_2014 = 23000 # Length in 2014 (m)
 E0 = 2900. # height equilibrium line t=0 (m)
-W = 1. # m glacier width
+w0 = 1.
+w1 = 3.
+a = 0.00045
+W=1
+
 
 # bed profile
 b0 = 3900. # upper bound bed elevation (m) for linear case, upper bound for concave case would be b0+ba
 ba = 0. # lower bound for concave bed profile
-s = 0.1 # Bed slope
+s = 0.1476401  # Bed slope
 s_A1 = 0.1476401 #Bed slope upper part Aletschglacier
 s_A2 = 0.0878518 #Bed slope lower part Aletschgacier
 b1 = b0 - s_A1 * 8033 #bed elevation at slope division Aletschglacier
@@ -359,7 +371,6 @@ dx = 100 #m
 dt = 1 #yr
 tmax = 100 #yr
 bed_profile = 'Aletschglacier' # use 'linear' or 'concave' or 'Aletschglacier'
-ds_dl = 0.
 
 #set bottom slope glacier
 x_arr = np.arange(0,Lmax,dx)
@@ -379,6 +390,7 @@ dE_dT = 110.  # change of the ELA per temperature change m/K
 L_arr = project_future_glacier(tmax,E0,L_0=0.01)
 plot_results()
 
+
 plt.figure(2)
 plt.title("E-folding time ")
 plt.xlabel("E [m]")
@@ -386,7 +398,7 @@ plt.ylabel("e-folding time [yr]")
 E_arr, t_efold_arr = E_vs_efolding(E0)
 plt.plot(E_arr, t_efold_arr)
 plt.savefig("efolding.png")
-#
+##
 plt.figure(3)
 plt.title("Stable steady state")
 plt.xlabel("E [m]")
@@ -395,9 +407,8 @@ E_arr, lmax_arr = E_fixed_points()
 plt.plot(E_arr, lmax_arr/1000)
 plt.savefig("steady_states.png")
 
-
 E0 = find_real_E0(2900.,21500.)
 L_arr, year_arr = calc_glacier(E0)
-
+#
 plt.figure(4)
 plt.plot(year_arr,L_arr)
