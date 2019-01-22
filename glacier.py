@@ -109,11 +109,13 @@ def Bs(Hm, E, L):
     
     # analytical function
     #return beta * ( mean_b(L) + Hm - E) * 1 * L
-    
     #numerical integration
-    return Bs_sum
+    
+    return Bs_sum + 2 * B_tribute(E,L)
 
-  
+def B_tribute(E,L):
+    return beta * (w0_trib * (h0_trib - E) * L_trib + 1/2 * (s_trib*w0_trib + (h0_trib -E)*q_trib)*L_trib**2 + 1/3*s_trib*q_trib*L_trib**3)
+    
 def F(Hm,L):
     """"calving"""
     Hf= max(kappa*Hm, d*rho_w/rho_i) #ice thickness at glacier front
@@ -211,7 +213,7 @@ def find_real_E0(E_guess, L_target, dE = 0.1, nu = 0.005):
     
     return E_guess
 
-def project_future_glacier(tmax, E, dT_dt=0, dE_dT=0, L_0=0.01, \
+def project_future_glacier(tmax, E, dT_dt=0, dE_dT=0, L_0=10.01, \
                            year_start = False, year_stab = False):
     """ Compute evolution of the glacier.
     Returns Bs_arr, Hm_arr, F_arr, L_arr
@@ -245,7 +247,7 @@ def project_future_glacier(tmax, E, dT_dt=0, dE_dT=0, L_0=0.01, \
     
     return L_arr, years
 
-def steady_state(E, L_0=0.001, Delta_L = 10., nu=0.1):
+def steady_state(E, L_0=10.001, Delta_L = 10., nu=0.1):
     
     Hm_0 = Hm(L_0)
     Bs_0 = Bs(Hm_0,E,L_0)
@@ -310,7 +312,7 @@ def read_ELA():
     ELA_perturbation = data[:-4,1]
     return years, ELA_perturbation
 
-def E_fixed_points(L_0=0.001):
+def E_fixed_points(L_0=10.001):
   """ Returns equilibrium glacier length and integration time for
       different values of E
   """
@@ -342,7 +344,7 @@ base_year = 2014 # year of measurement of the glacier length
 L_2014 = 21500 # Length in 2014 (m)
 E0 = 2900. # height equilibrium line t=0 (m)
 w0 = 1800.
-w1 = 3.
+w1 = 0 # 3.
 a = 0.00045
 
 
@@ -363,6 +365,16 @@ x_l = 7000. # m length scale for concave bed profile
 d = 0 # water depth
 kappa = 1. # fraction of mean ice thickness 
 c = 1. # 1/yr calving parameter 
+
+#tributary glacier
+w0_trib = 1500
+wend_trib = 3500
+h0_trib = 2900. 
+hend_trib =3600.
+L_trib = 4500. 
+
+s_trib = (hend_trib-h0_trib)/L_trib
+q_trib = (wend_trib-w0_trib)/L_trib
 
 # ===================
 # settings for the run
@@ -389,10 +401,10 @@ plt.figure(7)
 plt.plot(x_arr,W_function(x_arr))
 
 # initialize a first glacier
-L_arr, years = project_future_glacier(tmax,E0,L_0=0.01)
+L_arr, years = project_future_glacier(tmax,E0,L_0=10.1)
 plot_results()
 
-
+#%%
 plt.figure(2)
 plt.title("E-folding time ")
 plt.xlabel("E [m]")
