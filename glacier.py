@@ -4,10 +4,6 @@ from __future__ import print_function
 
 import numpy as np #This file is a preliminary version of the ice sheet model
 import matplotlib.pyplot as plt
-try: 
-    from types import NoneType
-except ImportError:
-    print("Cannot import NoneType")
 # =============================================================================
 # Plot functions
 # ============================================================================= 
@@ -111,10 +107,17 @@ def Bs(Hm, E, L):
     #return beta * ( mean_b(L) + Hm - E) * 1 * L
     #numerical integration
     
-    return Bs_sum + 2 * B_tribute(E,L)
+    # Buckets (Jungfraufirn, Ewigschneefäld, Grüneggfirn respectively)
+    return Bs_sum \
+           + B_tribute(E, 6000., 1200, 3500, 2700, 3600) \
+           + B_tribute(E, 4800., 1400, 3500, 2700, 3600) \
+           + B_tribute(E, 2400., 350,  1500, 2700, 3600)
 
-def B_tribute(E,L):
-    return beta * (w0_trib * (h0_trib - E) * L_trib + 1/2 * (s_trib*w0_trib + (h0_trib -E)*q_trib)*L_trib**2 + 1/3*s_trib*q_trib*L_trib**3)
+def B_tribute(E, L_trib, w_0_trib, w_end_trib, h_0_trib, h_end_trib):
+    s_trib = (h_end_trib - h_0_trib)/L_trib
+    q_trib = (w_end_trib - w_0_trib)/L_trib
+    return beta * (w_0_trib * (h_0_trib - E) * L_trib + 1/2 * (s_trib * w_0_trib 
+                   + (h_0_trib - E) * q_trib) * L_trib**2 + 1/3*s_trib*q_trib*L_trib**3)
     
 def F(Hm,L):
     """"calving"""
@@ -341,7 +344,7 @@ rho_i = 917. #kg/m3 density ice
 # =============================================================================
 # Aletschgletscher data
 base_year = 2014 # year of measurement of the glacier length
-L_2014 = 21500 # Length in 2014 (m)
+L_2014 = 23950 # Length in 2014 (m)
 E0 = 2900. # height equilibrium line t=0 (m)
 w0 = 1800.
 w1 = 0 # 3.
@@ -365,16 +368,6 @@ x_l = 7000. # m length scale for concave bed profile
 d = 0 # water depth
 kappa = 1. # fraction of mean ice thickness 
 c = 1. # 1/yr calving parameter 
-
-#tributary glacier
-w0_trib = 1500
-wend_trib = 3500
-h0_trib = 2900. 
-hend_trib =3600.
-L_trib = 4500. 
-
-s_trib = (hend_trib-h0_trib)/L_trib
-q_trib = (wend_trib-w0_trib)/L_trib
 
 # ===================
 # settings for the run
@@ -447,7 +440,7 @@ plt.savefig("figures/historical_glacier.png",dpi=300)
 
 E_2014 = E0 + read_ELA()[1][-1]
 y_start = 2014
-y_end = 2150
+y_end = 2200
 y_stab = 2100
 L_arr_future_001, years_future = \
 project_future_glacier(y_end-y_start, E_2014, 0.01, 110, L_2014, y_start, y_stab)
