@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 # Plot functions
 # ============================================================================= 
 def plot_results():
-    plt.close("all")
+    #plt.close("all")
     fig, ax = plt.subplots(nrows=1, ncols=2)
     fig.set_size_inches(12, 6)
     ax[0].set_title("bed profile: " + str(bed_profile))
@@ -107,11 +107,18 @@ def Bs(Hm, E, L):
     #return beta * ( mean_b(L) + Hm - E) * 1 * L
     #numerical integration
     
+    
+    if w1 == 0:
     # Buckets (Jungfraufirn, Ewigschneefaeld, Grueneggfirn respectively)
-    return Bs_sum \
+        B_total = Bs_sum \
            + B_tribute(E, 6000., 1200, 3500, 2700, 3600) \
            + B_tribute(E, 4800., 1400, 3500, 2700, 3600) \
            + B_tribute(E, 2400., 350,  1500, 2700, 3600)
+    else:
+    # Varying width
+        B_total = Bs_sum
+    
+    return B_total 
 
 def B_tribute(E, L_trib, w_0_trib, w_end_trib, h_0_trib, h_end_trib):
     s_trib = (h_end_trib - h_0_trib)/L_trib
@@ -193,7 +200,7 @@ def calc_glacier(E_guess):
         integrate(L_arr[i],Hm_arr[i],Bs_arr[i],F_arr[i],E_arr[i])
     return L_arr, years
 
-def find_real_E0(E_guess, L_target, dE = 0.1, nu = 0.005):
+def find_real_E0(E_guess, L_target, dE = 0.1, mu = 0.005):
     L_error1 = 10e5
     E_new = E_guess
     
@@ -212,7 +219,7 @@ def find_real_E0(E_guess, L_target, dE = 0.1, nu = 0.005):
         
         derror1_dE = (L_error2-L_error1)/dE
         
-        E_new = E_guess - nu * L1 / derror1_dE
+        E_new = E_guess - mu * L1 / derror1_dE
     
     return E_guess
 
@@ -250,7 +257,7 @@ def project_future_glacier(tmax, E, dT_dt=0, dE_dT=0, L_0=10.01, \
     
     return L_arr, years
 
-def steady_state(E, L_0=10.001, Delta_L = 10., nu=0.1):
+def steady_state(E, L_0=10.001, Delta_L = 10., mu=0.1):
     
     Hm_0 = Hm(L_0)
     Bs_0 = Bs(Hm_0,E,L_0)
@@ -276,8 +283,8 @@ def steady_state(E, L_0=10.001, Delta_L = 10., nu=0.1):
         
         ddL_dtdL = (dL_dt1 - dL_dt0)/Delta_L 
         
-        correction = dL_dt0/ddL_dtdL
-        L_0 = L_0 - nu * correction
+        correction = mu*dL_dt0/ddL_dtdL
+        L_0 = L_0 -  correction
         if L_0 <= 0.:
             L_0 = 0
             break
@@ -289,6 +296,7 @@ def efolding(E, L_ref):
     :param E: new equilibrium line height
     :param L_ref: glacier length for an reference equilibrium height
     """
+    print("--steady state")
     L_ss = steady_state(E, L_ref)
     
     if abs(L_ss - L_ref) < 10:
@@ -300,7 +308,7 @@ def efolding(E, L_ref):
     H_new, B_new, F_new = 0, 0, 0
     
     t_efold = 0
-    
+    print("--efolding")
     while (L_new > L_efold and L_old > L_efold) or (L_new < L_efold and L_old < L_efold):
         L_old, H_old, B_old, F_old = L_new, H_new, B_new, F_new 
         L_new, H_new, B_new, F_new = integrate(L_old, H_old, B_old, F_old,E)  
@@ -328,8 +336,10 @@ def E_vs_efolding(ref_E):
       the glacier length is the equilibrium length calculated
       from a reference value of E (E0)
   """
+  print("-find ref steady state")
   L_equil = steady_state(ref_E)
   E_arr = np.arange(1000, 4000, 10)
+  print("-find efolding")
   t_efold_arr = np.array([efolding(E,L_equil) for E in E_arr])
   return E_arr, t_efold_arr
 
@@ -346,8 +356,8 @@ rho_i = 917. #kg/m3 density ice
 base_year = 2014 # year of measurement of the glacier length
 L_2014 = 23950 # Length in 2014 (m)
 E0 = 2900. # height equilibrium line t=0 (m)
-w0 = 1800.
-w1 = 0 # 3.
+w0 = 1200.
+w1 =  3.
 a = 0.00045
 
 
@@ -387,20 +397,19 @@ t_arr = np.arange(0,tmax,dt)
 dT_dt = 0.01 # change of temparture per year K/a 
 dE_dT = 110.  # change of the ELA per temperature change m/K
 
-# =============================================================================
+#%% =============================================================================
 # Main programm
 # =============================================================================
-plt.figure(7)
-plt.plot(x_arr,W_function(x_arr))
 
 # initialize a first glacier
 L_arr, years = project_future_glacier(tmax,E0,L_0=10.1)
 plot_results()
 
 #%%
+print("Efolding")
 plt.figure(2)
 plt.title("E-folding time ")
-plt.xlabel("E [m]")
+plt.xlabel("E$_0$ [m]")
 plt.ylabel("e-folding time [yr]")
 E_arr, t_efold_arr = E_vs_efolding(E0)
 plt.plot(E_arr, t_efold_arr)
@@ -409,10 +418,10 @@ plt.savefig("figures/efolding.png",dpi=300)
 
 
 
-
+print("E Fixed points")
 plt.figure(3)
 plt.title("Stable steady state")
-plt.xlabel("E [m]")
+plt.xlabel("E$_0$ [m]")
 plt.ylabel("L [km]")
 E_arr, lmax_arr = E_fixed_points()
 plt.plot(E_arr, lmax_arr/1000)
@@ -422,7 +431,7 @@ plt.savefig("figures/steady_states.png",dpi=300)
 
 
 
-
+print("Find E0")
 E0 = find_real_E0(2900.,21500.)
 L_arr, year_arr = calc_glacier(E0)
 
@@ -461,6 +470,7 @@ plt.plot(years_future, L_arr_future_002, label='0.02 K/a')
 plt.plot(years_future, L_arr_future_004, label='0.04 K/a')
 plt.plot(years_future, L_arr_future_008, label='0.08 K/a')
 plt.legend()
+plt.grid()
 plt.savefig("figures/future_glacier.png", dpi=300)
 
 
@@ -475,3 +485,8 @@ plt.xlabel("t [yr]")
 plt.ylabel("ELA perturbation (m)")
 plt.plot(ELA_years, ELA_perturbation)
 plt.savefig("figures/ELA_evolution.png",dpi=300)
+
+#%%
+plt.figure(7)
+plt.plot(x_arr,W_function(x_arr)/2,'k')
+plt.plot(x_arr,-W_function(x_arr)/2,'k')
