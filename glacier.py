@@ -107,7 +107,7 @@ def Bs(Hm, E, L):
     #return beta * ( mean_b(L) + Hm - E) * 1 * L
     #numerical integration
     
-    # Buckets (Jungfraufirn, Ewigschneefäld, Grüneggfirn respectively)
+    # Buckets (Jungfraufirn, Ewigschneefaeld, Grueneggfirn respectively)
     return Bs_sum \
            + B_tribute(E, 6000., 1200, 3500, 2700, 3600) \
            + B_tribute(E, 4800., 1400, 3500, 2700, 3600) \
@@ -116,8 +116,8 @@ def Bs(Hm, E, L):
 def B_tribute(E, L_trib, w_0_trib, w_end_trib, h_0_trib, h_end_trib):
     s_trib = (h_end_trib - h_0_trib)/L_trib
     q_trib = (w_end_trib - w_0_trib)/L_trib
-    return beta * (w_0_trib * (h_0_trib - E) * L_trib + 1/2 * (s_trib * w_0_trib 
-                   + (h_0_trib - E) * q_trib) * L_trib**2 + 1/3*s_trib*q_trib*L_trib**3)
+    return max(0,beta * (w_0_trib * (h_0_trib - E) * L_trib + 1/2 * (s_trib * w_0_trib 
+                   + (h_0_trib - E) * q_trib) * L_trib**2 + 1/3*s_trib*q_trib*L_trib**3))
     
 def F(Hm,L):
     """"calving"""
@@ -352,7 +352,7 @@ a = 0.00045
 
 
 # bed profile
-b0 = 3900. # upper bound bed elevation (m) for linear case, upper bound for concave case would be b0+ba
+b0 = 3875. # upper bound bed elevation (m) for linear case, upper bound for concave case would be b0+ba
 ba = 0. # lower bound for concave bed profile
 s = 0.1#476401  # Bed slope
 s_A1 = 0.1476401 #Bed slope upper part Aletschglacier
@@ -440,7 +440,7 @@ plt.savefig("figures/historical_glacier.png",dpi=300)
 
 E_2014 = E0 + read_ELA()[1][-1]
 y_start = 2014
-y_end = 2200
+y_end = 2250
 y_stab = 2100
 L_arr_future_001, years_future = \
 project_future_glacier(y_end-y_start, E_2014, 0.01, 110, L_2014, y_start, y_stab)
@@ -448,6 +448,8 @@ L_arr_future_002, years_future = \
 project_future_glacier(y_end-y_start, E_2014, 0.02, 110, L_2014, y_start, y_stab)
 L_arr_future_004, years_future = \
 project_future_glacier(y_end-y_start, E_2014, 0.04, 110, L_2014, y_start, y_stab)
+L_arr_future_008, years_future = \
+project_future_glacier(y_end-y_start, E_2014, 0.08, 110, L_2014, y_start, y_stab)
 
 plt.figure(5)
 plt.title("Glacier Length Evolution under Climate Change Scenarios")
@@ -457,6 +459,7 @@ plt.axvline(y_stab, linestyle='--', c='red', label='stabilization year')
 plt.plot(years_future, L_arr_future_001, label='0.01 K/a')
 plt.plot(years_future, L_arr_future_002, label='0.02 K/a')
 plt.plot(years_future, L_arr_future_004, label='0.04 K/a')
+plt.plot(years_future, L_arr_future_008, label='0.08 K/a')
 plt.legend()
 plt.savefig("figures/future_glacier.png", dpi=300)
 
