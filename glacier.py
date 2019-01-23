@@ -357,7 +357,7 @@ base_year = 2014 # year of measurement of the glacier length
 L_2014 = 23950 # Length in 2014 (m)
 E0 = 2900. # height equilibrium line t=0 (m)
 w0 = 1200.
-w1 =  3.
+w1 = 3.
 a = 0.00045
 
 
@@ -412,8 +412,12 @@ plt.title("E-folding time ")
 plt.xlabel("E$_0$ [m]")
 plt.ylabel("e-folding time [yr]")
 E_arr, t_efold_arr = E_vs_efolding(E0)
-plt.plot(E_arr, t_efold_arr)
+if w1==0:
+    plt.plot(E_arr, t_efold_arr,label="Tributary glaciers")
+else:
+    plt.plot(E_arr, t_efold_arr,label="Varying width")
 
+plt.legend()
 plt.savefig("figures/efolding.png",dpi=300)
 
 
@@ -424,8 +428,11 @@ plt.title("Stable steady state")
 plt.xlabel("E$_0$ [m]")
 plt.ylabel("L [km]")
 E_arr, lmax_arr = E_fixed_points()
-plt.plot(E_arr, lmax_arr/1000)
-
+if w1==0:
+    plt.plot(E_arr, lmax_arr/1000,label="Tributary glaciers")
+else:
+    plt.plot(E_arr, lmax_arr/1000,label="Varying width")
+plt.legend()
 plt.savefig("figures/steady_states.png",dpi=300)
 
 
@@ -436,10 +443,14 @@ E0 = find_real_E0(2900.,21500.)
 L_arr, year_arr = calc_glacier(E0)
 
 plt.figure(4)
-plt.plot(year_arr,L_arr)
+if w1 == 0:    
+    plt.plot(year_arr,L_arr/1000,label="Tributary glaciers")
+else:
+    plt.plot(year_arr,L_arr/1000,label="Varying width")
 plt.title("Historical Glacier Length Evolution")
 plt.xlabel("t [yr]")
 plt.ylabel("L [km]")
+plt.legend()
 plt.savefig("figures/historical_glacier.png",dpi=300)
 
 
@@ -488,5 +499,10 @@ plt.savefig("figures/ELA_evolution.png",dpi=300)
 
 #%%
 plt.figure(7)
-plt.plot(x_arr,W_function(x_arr)/2,'k')
-plt.plot(x_arr,-W_function(x_arr)/2,'k')
+x_arr_plot = np.linspace(0,Lmax,1000)
+
+plt.plot(x_arr_plot/1000,W_function(x_arr_plot)/2000,'k')
+plt.plot(x_arr_plot/1000,-W_function(x_arr_plot)/2000,'k')
+plt.xlabel("L [km]")
+plt.ylabel("W [km]")
+plt.savefig("figures/width.png")
